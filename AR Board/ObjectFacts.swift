@@ -21,7 +21,7 @@ struct ObjectFact {
                                     titlePosition: (-0.2, 0.2),
                                     name: "solo cup")
 
-    static let Mouse = ObjectFact(facts: ["clicky input device", "invented by xerox", "origin of name unknown"],
+    static let Mouse = ObjectFact(facts: ["clicky input device", "invented by Douglas Engelbart", "origin of name unknown"],
                                     titlePosition: (-0.2, 0.2),
                                     name: "mouse")
 
