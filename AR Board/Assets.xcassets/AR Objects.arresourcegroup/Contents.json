@@ -5,6 +5,12 @@
   },
   "resources" : [
     {
+      "filename" : "mouse.arobject"
+    },
+    {
+      "filename" : "solo cup.arobject"
+    },
+    {
       "filename" : "water bottle.arobject"
     }
   ]
