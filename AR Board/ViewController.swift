@@ -3,7 +3,7 @@
 //  AR Board
 //
 //  Created by Tyler Franklin on 7/3/19.
-//  Copyright © 2019 RFCUNY CCNY BMCC CVPR. All rights reserved.
+//  Copyright © 2019 Tyler Franklin. All rights reserved.
 //
 
 import UIKit
@@ -13,28 +13,30 @@ import ARKit
 class ViewController: UIViewController, ARSCNViewDelegate {
 
     @IBOutlet var sceneView: ARSCNView!
-    
+    @IBOutlet weak var instructionLabel: UILabel!
+
+    private var imageConfiguration: ARImageTrackingConfiguration?
+    private var worldConfiguration: ARWorldTrackingConfiguration?
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        // Set the view's delegate
+
         sceneView.delegate = self
-        
-        // Show statistics such as fps and timing information
         sceneView.showsStatistics = true
-        
-        // Create a new scene
-        let scene = SCNScene(named: "art.scnassets/ship.scn")!
-        
-        // Set the scene to the view
+
+        let scene = SCNScene()
         sceneView.scene = scene
+
+        setupObjectDetection()
     }
-    
+
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        
-        // Create a session configuration
-        let configuration = ARWorldTrackingConfiguration()
+        if let configuration = worldConfiguration {
+            sceneView.debugOptions = .showFeaturePoints
+            sceneView.session.run(configuration)
+        }
+    }
 
         // Run the view's session
         sceneView.session.run(configuration)
