@@ -9,8 +9,9 @@
 import UIKit
 import SceneKit
 import ARKit
+import CoreMedia
 
-class ViewController: UIViewController, ARSCNViewDelegate {
+class ViewController: UIViewController {
 
     @IBOutlet var sceneView: ARSCNView!
     @IBOutlet weak var instructionLabel: UILabel!
@@ -38,40 +39,185 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         }
     }
 
-        // Run the view's session
-        sceneView.session.run(configuration)
-    }
-    
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        
-        // Pause the view's session
         sceneView.session.pause()
     }
 
-    // MARK: - ARSCNViewDelegate
-    
-/*
-    // Override to create and configure nodes for anchors added to the view's session.
-    func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
-        let node = SCNNode()
-     
-        return node
+    private func setupImageDetection() {
+        imageConfiguration = ARImageTrackingConfiguration()
+
+        guard let referenceImages = ARReferenceImage.referenceImages(
+            inGroupNamed: "AR Images", bundle: nil) else {
+                fatalError("Missing expected asset catalog resources.")
+        }
+
+        imageConfiguration?.trackingImages = referenceImages
     }
-*/
-    
+
+    private func setupObjectDetection() {
+        worldConfiguration = ARWorldTrackingConfiguration()
+
+        guard let referenceObjects = ARReferenceObject.referenceObjects(
+            inGroupNamed: "AR Objects", bundle: nil) else {
+                fatalError("Missing expected asset catalog resources.")
+        }
+
+        worldConfiguration?.detectionObjects = referenceObjects
+
+        guard let referenceImages = ARReferenceImage.referenceImages(
+            inGroupNamed: "AR Images", bundle: nil) else {
+                fatalError("Missing expected asset catalog resources.")
+        }
+
+        worldConfiguration?.detectionImages = referenceImages
+    }
+
+}
+
+extension ViewController: ARSessionDelegate {
     func session(_ session: ARSession, didFailWithError error: Error) {
-        // Present an error message to the user
-        
+        guard
+            let error = error as? ARError,
+            let code = ARError.Code(rawValue: error.errorCode)
+            else { return }
+
+        instructionLabel.isHidden = false
+
+        switch code {
+        case .cameraUnauthorized:
+            instructionLabel.text = "Camera tracking is not available. Please check your camera permissions."
+        default:
+            instructionLabel.text = "Error starting ARKit. Please fix the app and relaunch."
+        }
     }
-    
-    func sessionWasInterrupted(_ session: ARSession) {
-        // Inform the user that the session has been interrupted, for example, by presenting an overlay
-        
+
+    func session(_ session: ARSession, cameraDidChangeTrackingState camera: ARCamera) {
+        switch camera.trackingState {
+        case .limited(let reason):
+            instructionLabel.isHidden = false
+            switch reason {
+            case .excessiveMotion:
+                instructionLabel.text = "Too much motion! Slow down."
+            case .initializing, .relocalizing:
+                instructionLabel.text = "ARKit is doing it's thing. Move around slowly for a bit while it warms up."
+            case .insufficientFeatures:
+                instructionLabel.text = "Not enough features detected, try moving around a bit more or turning on the lights."
+            }
+        case .normal:
+            instructionLabel.text = "Point the camera at an object."
+        case .notAvailable:
+            instructionLabel.isHidden = false
+            instructionLabel.text = "Camera tracking is not available."
+        }
     }
-    
-    func sessionInterruptionEnded(_ session: ARSession) {
-        // Reset tracking and/or remove existing anchors if consistent tracking is required
-        
+}
+
+extension ViewController: ARSCNViewDelegate {
+    func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
+
+        DispatchQueue.main.async { self.instructionLabel.isHidden = true }
+
+// Image recognition
+//        if let imageAnchor = anchor as? ARImageAnchor {
+//            handleFoundImage(imageAnchor, node)
+//        } else
+
+        // Object recognition
+        if let objectAnchor = anchor as? ARObjectAnchor {
+            handleFoundObject(objectAnchor, node)
+        }
+    }
+
+//    private func handleFoundImage(_ imageAnchor: ARImageAnchor, _ node: SCNNode) {
+//        let name = imageAnchor.referenceImage.name!
+//        print("you found a \(name) image")
+//
+//        let size = imageAnchor.referenceImage.physicalSize
+//        if let videoNode = makeObjectVideo(size: size) {
+//            node.addChildNode(videoNode)
+//            node.opacity = 1
+//        }
+//    }
+
+//    private func makeObjectVideo(size: CGSize) -> SCNNode? {
+//        // 1
+//        guard let videoURL = Bundle.main.url(forResource: "dinosaur",
+//                                             withExtension: "mp4") else {
+//                                                return nil
+//        }
+//
+//        // 2
+//        let avPlayerItem = AVPlayerItem(url: videoURL)
+//        let avPlayer = AVPlayer(playerItem: avPlayerItem)
+//        avPlayer.play()
+//
+//        // 3
+//        NotificationCenter.default.addObserver(
+//            forName: .AVPlayerItemDidPlayToEndTime,
+//            object: nil,
+//            queue: nil) { notification in
+//                avPlayer.seek(to: .zero)
+//                avPlayer.play()
+//        }
+//
+//        // 4
+//        let avMaterial = SCNMaterial()
+//        avMaterial.diffuse.contents = avPlayer
+//
+//        // 5
+//        let videoPlane = SCNPlane(width: size.width, height: size.height)
+//        videoPlane.materials = [avMaterial]
+//
+//        // 6
+//        let videoNode = SCNNode(geometry: videoPlane)
+//        videoNode.eulerAngles.x = -.pi / 2
+//        return videoNode
+//    }
+
+    private func handleFoundObject(_ objectAnchor: ARObjectAnchor, _ node: SCNNode) {
+        // 1
+        let name = objectAnchor.referenceObject.name!
+        print("You found a \(name) object")
+
+        // 2
+        if let facts = ObjectFact.facts(for: name) {
+            // 3
+            let titleNode = createTitleNode(info: facts)
+            node.addChildNode(titleNode)
+
+            // 4
+            let bullets = facts.facts.map { "• " + $0 }.joined(separator: "\n")
+
+            // 5
+            let factsNode = createInfoNode(facts: bullets)
+            node.addChildNode(factsNode)
+        }
+    }
+
+    private func createTitleNode(info: ObjectFact) -> SCNNode {
+        let title = SCNText(string: info.name, extrusionDepth: 0.6)
+        let titleNode = SCNNode(geometry: title)
+        titleNode.scale = SCNVector3(0.005, 0.005, 0.01)
+        titleNode.position = SCNVector3(info.titlePosition.x, info.titlePosition.y, 0)
+        return titleNode
+    }
+
+    private func createInfoNode(facts: String) -> SCNNode {
+        // 1
+        let textGeometry = SCNText(string: facts, extrusionDepth: 0.7)
+        let textNode = SCNNode(geometry: textGeometry)
+        textNode.scale = SCNVector3(0.003, 0.003, 0.01)
+        textNode.position = SCNVector3(0.02, 0.01, 0)
+
+        // 2
+        let material = SCNMaterial()
+        material.diffuse.contents = UIColor.blue
+        textGeometry.materials = [material]
+
+        // 3
+        let billboardConstraints = SCNBillboardConstraint()
+        textNode.constraints = [billboardConstraints]
+        return textNode
     }
 }
