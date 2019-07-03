@@ -7,15 +7,19 @@
 //
 
 import UIKit
+import ARKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
 
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        guard ARImageTrackingConfiguration.isSupported,
+            ARWorldTrackingConfiguration.isSupported else {
+                fatalError("ARKit is not available on this device.")
+        }
 
-    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
         return true
     }
 
